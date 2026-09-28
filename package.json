@@ -1,0 +1,31 @@
+{
+  "name": "ta-vp",
+  "version": "1.0.0",
+  "description": "Veebiprogrammerimise tundides tehtud veeb",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://VsevolodTsarev2001@github.com/VsevolodTsarev2001/TA-vp.git"
+  },
+  "keywords": [
+    "Node.Js",
+    "veeb",
+    "Tallinna",
+    "Ülikool",
+    "DTI",
+    "üliõpilane",
+    "koolitöö"
+  ],
+  "author": "Vsevolod Tsarev",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/VsevolodTsarev2001/TA-vp/issues"
+  },
+  "homepage": "https://github.com/VsevolodTsarev2001/TA-vp#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
