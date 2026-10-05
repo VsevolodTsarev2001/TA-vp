@@ -26,7 +26,9 @@
   },
   "homepage": "https://github.com/VsevolodTsarev2001/TA-vp#readme",
   "dependencies": {
+    "dotenv": "^18.0.5",
     "ejs": "^6.0.1",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "mysql2": "^3.24.5"
   }
 }
