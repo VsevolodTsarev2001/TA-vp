@@ -3,14 +3,13 @@ const fs = require('fs').promises;
 const dateET = require('./src/dateTimeET');
 const bodyparser = require('body-parser');
 
-
-//moodul andmebaasiga suhtlemiseks, promises osaga async programmerimise jaoks
+// moodul andmebaasiga suhtlemiseks, promises osaga async programmerimise jaoks
 const mysql = require('mysql2/promise');
-//moodul .env faili lugemiseks, keskkonnamuutujate parsimiseks
+// moodul .env faili lugemiseks, keskkonnamuutujate parsimiseks
 require ('dotenv').config();
 
 const textRef = 'public/txt/vanasonad.txt';
-const regTextRef = 'public/txt/visits.txt'; // Parandasin siin muutuja suure 'T'-ga (koodis oli regtextRef vs regTextRef)
+const regTextRef = 'public/txt/visits.txt';
 
 const app = express();
 
@@ -23,16 +22,6 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyparser.urlencoded({ extended: false }));
 
-/*
-// loon andmebaasiühenduse
-const conn = mysql.createConnection({
-    host: 'localhost',
-    user: 'if26',
-    password: 'ifikas26',
-    database: 'if26_vsevolod_tsarev_TA'
-})
-*/
-
 // --- Marsruudid ---
 
 app.get('/', (req, res)=>{
@@ -42,9 +31,7 @@ app.get('/', (req, res)=>{
     res.render('index', {dayNow: dayNow, dateNow: dateNow, timeNow: timeNow});
 });
 
-// 1. Punkt: Lisage uus marsruut eelmise kodutöö lehe jaoks (näiteks /kodune)
 app.get('/kodune', (req, res) => {
-    // Siia saate panna oma eelmise kodutöö lehe renderdamise või sisu
     res.render('kodune'); 
 });
 
@@ -64,14 +51,12 @@ app.get('/regvisit', (req, res)=>{
     res.render('regvisit');
 });
 
-// 2. Punkt: Täiendatud POST päring nime, kuupäeva ja kellaaja salvestamiseks
 app.post('/regvisit', async (req, res)=>{
     try {
         const name = req.body.nameInput;
         const dateNow = dateET.fullDate(0);
         const timeNow = dateET.fullTime();
         
-        // Formaat: nimi, kuupäev, kellaaeg;
         const recordLine = `${name}, ${dateNow}, ${timeNow};`;
 
         await fs.appendFile(regTextRef, recordLine);
@@ -83,28 +68,23 @@ app.post('/regvisit', async (req, res)=>{
     }
 });
 
-// 3. Punkt: Uus marsruut viimase külastuse kuvamiseks
 app.get('/lastvisit', async (req, res) => {
     try {
         const data = await fs.readFile(regTextRef, 'utf8');
         const visitsList = data.split(';');
         
-        // Kuna viimane element on tühi (sest iga kirje lõpus on ';'),
-        // siis viimane tegelik külastus on eelviimane ehk visitsList.length - 2
         let lastVisitMessage = "Külastusi pole veel registreeritud.";
 
         if (visitsList.length > 1) {
             const lastIndex = visitsList.length - 2;
-            const lastRecord = visitsList[lastIndex]; // Formaat: nimi, kuupäev, kellaaeg
+            const lastRecord = visitsList[lastIndex];
             
-            // Jagame kirje komade järgi osadeks
             const parts = lastRecord.split(',');
             if (parts.length >= 3) {
                 const name = parts[0].trim();
                 const date = parts[1].trim();
                 const time = parts[2].trim();
 
-                // "Viimati registreeriti külastus [kuupäev], kell [kellaaeg] kui seda tegi [nimi]."
                 lastVisitMessage = `Viimati registreeriti külastus ${date}, kell ${time} kui seda tegi ${name}.`;
             }
         }
@@ -117,14 +97,13 @@ app.get('/lastvisit', async (req, res) => {
 });
 
 app.get('/eestifilm', (req,res)=>{
-	res.render('eestifilm');
+    res.render('eestifilm');
 });
 
 app.get('/eestifilm/inimesed', async (req,res)=>{
-    //console.log('Andmebaasiserver on: ' + process.env.DB_HOST);
     let conn;
-	try{
-        const conn = await mysql.createConnection({
+    try{
+        conn = await mysql.createConnection({
             host: process.env.DB_HOST,
             user: process.env.DB_USER,
             password: process.env.DB_PASS,
@@ -132,7 +111,6 @@ app.get('/eestifilm/inimesed', async (req,res)=>{
         });
         const sqlReq = 'SELECT * FROM person ORDER by last_name';
         const [sqlRes] = await conn.execute(sqlReq);
-        console.log(sqlRes);
         res.render('eestifilminimesed', {personList: sqlRes});
     }
     catch (err){
@@ -146,49 +124,151 @@ app.get('/eestifilm/inimesed', async (req,res)=>{
     }
 });
 
-
+// ISIKU LISAMINE - GET (tühjad väärtused alguses)
 app.get('/eestifilm/inimesed_add', (req, res)=>{
-	res.render('eestifilmiinimesed_add', {notice: 'Ootan sisestust!'});
+    res.render('eestifilmiinimesed_add', {
+        notice: 'Ootan sisestust!',
+        firstNameInput: '',
+        lastNameInput: '',
+        bornInput: '',
+        deceasedInput: ''
+    });
 });
 
+// ISIKU LISAMINE - POST (täiendatud kontrollid ja väärtuste tagastamine vea korral)
 app.post('/eestifilm/inimesed_add', async (req, res)=>{
-	console.log(req.body);
-	//kontrollime andmete olemasolu
-	if(!req.body.firstNameInput || !req.body.lastNameInput || !req.body.bornInput || !req.body.bornInput >= new Date()){
-		console.log('Andmed pole korrektsed');
-		return res.render('eestifilmiinimesed_add', {notice: 'Andmed on puudulikud!'});
-	}
-	let conn;
-	try {
-		conn = await mysql.createConnection({
-			host: process.env.DB_HOST,
-			user: process.env.DB_USER,
-			password: process.env.DB_PASS,
-			database: process.env.DB_NAME
-		});
-		let sqlReq = 'INSERT INTO person (first_name, last_name, born, deceased) VALUES (?,?,?,?)';
-		let deceacedDate = null;
-		if(req.body.deceasedInput !=''){
-			deceacedDate = req.body.deceasedInput;
-		}
-		await conn.execute(sqlReq, [
-			req.body.firstNameInput,
-			req.body.lastNameInput,
-			req.body.bornInput,
-			deceacedDate
-		]);
-		res.render('eestifilmiinimesed_add', {notice: 'Andmed salvestati! Ootan uut sisestust!'});
-	}
-	catch (err) {
-		console.log('Viga andmebaasiga suhtlemisel: ' + err);
-		res.render('eestifilmiinimesed_add', {notice: 'Tekkis viga, andmeid ei salvestatud!'});
-	}
-	finally {
-		if(conn){
-			await conn.end();
-		}
-	}
+    const firstName = req.body.firstNameInput;
+    const lastName = req.body.lastNameInput;
+    const bornInputStr = req.body.bornInput;
+    const deceasedInputStr = req.body.deceasedInput;
+
+    const renderWithError = (errorMsg) => {
+        return res.render('eestifilmiinimesed_add', {
+            notice: errorMsg,
+            firstNameInput: firstName,
+            lastNameInput: lastName,
+            bornInput: bornInputStr,
+            deceasedInput: deceasedInputStr
+        });
+    };
+
+    if (!firstName || !lastName || !bornInputStr) {
+        return renderWithError('Eesnimi, perekonnanimi ja sünnikuupäev on kohustuslikud!');
+    }
+
+    const now = new Date();
+    const bornDate = new Date(bornInputStr);
+
+    if (isNaN(bornDate.getTime()) || bornDate > now) {
+        return renderWithError('Vigane sünnikuupäev! Kuupäev on vale või tulevikus.');
+    }
+
+    let deceasedDateForDb = null;
+    if (deceasedInputStr !== '') {
+        const deceasedDate = new Date(deceasedInputStr);
+
+        if (isNaN(deceasedDate.getTime()) || deceasedDate > now) {
+            return renderWithError('Vigane surmakuupäev! Kuupäev on vale või tulevikus.');
+        }
+
+        if (deceasedDate < bornDate) {
+            return renderWithError('Surmakuupäev ei saa olla varasem kui sünnikuupäev!');
+        }
+        deceasedDateForDb = deceasedInputStr;
+    }
+
+    let conn;
+    try {
+        conn = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASS,
+            database: process.env.DB_NAME
+        });
+
+        let sqlReq = 'INSERT INTO person (first_name, last_name, born, deceased) VALUES (?,?,?,?)';
+        await conn.execute(sqlReq, [
+            firstName,
+            lastName,
+            bornInputStr,
+            deceasedDateForDb
+        ]);
+
+        res.render('eestifilmiinimesed_add', {
+            notice: 'Andmed salvestati! Ootan uut sisestust!',
+            firstNameInput: '',
+            lastNameInput: '',
+            bornInput: '',
+            deceasedInput: ''
+        });
+    }
+    catch (err) {
+        console.log('Viga andmebaasiga suhtlemisel: ' + err);
+        renderWithError('Tekkis viga andmebaasiga suhtlemisel, andmeid ei salvestatud!');
+    }
+    finally {
+        if(conn){
+            await conn.end();
+        }
+    }
 });
+
+
+// --- KAKS UUT MARSRUUTI (Filmid ja Ametid) ---
+
+app.get('/eestifilm/filmid_add', (req, res) => {
+    res.render('eestifilmimod_add', {
+        notice: 'Ootan filmi sisestust!',
+        titleInput: '',
+        yearInput: ''
+    });
+});
+
+app.post('/eestifilm/filmid_add', async (req, res) => {
+    const title = req.body.titleInput;
+    const year = req.body.yearInput;
+
+    if (!title || !year) {
+        return res.render('eestifilmimod_add', {
+            notice: 'Pealkiri ja aasta on kohustuslikud!',
+            titleInput: title,
+            yearInput: year
+        });
+    }
+
+    res.render('eestifilmimod_add', {
+        notice: 'Film edukalt lisatud!',
+        titleInput: '',
+        yearInput: ''
+    });
+});
+
+app.get('/eestifilm/ametid_add', (req, res) => {
+    res.render('eestifilmiamet_add', {
+        notice: 'Ootan ameti sisestust!',
+        positionInput: ''
+    });
+});
+
+app.post('/eestifilm/ametid_add', async (req, res) => {
+    const position = req.body.positionInput;
+
+    if (!position) {
+        return res.render('eestifilmiamet_add', {
+            notice: 'Ameti nimetus on kohustuslik!',
+            positionInput: position
+        });
+    }
+
+    res.render('eestifilmiamet_add', {
+        notice: 'Amet edukalt lisatud!',
+        positionInput: ''
+    });
+});
+
+const galleryPhotoUploadRouter = require('./routes/galleryPhotoUploadRoutes');
+app.use('/galleryPhotoUpload', galleryPhotoUploadRouter);
+
 app.listen(5125, () => {
     console.log('Server töötab aadressil http://greeny.cs.tlu.ee:5125');
 });
